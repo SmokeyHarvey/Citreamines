@@ -292,9 +292,9 @@ export default function DiamondMiner() {
       // Check if the tile is a bomb
       if (gameState.grid[index] === "bomb") {
         // Update local state for game over
-        setGameState({
-          ...gameState,
-          revealed: newRevealed,
+    setGameState({
+      ...gameState,
+      revealed: newRevealed,
           gameOver: true,
           earnings: 0,
           isActive: false
@@ -451,14 +451,19 @@ export default function DiamondMiner() {
           <div className="flex justify-center mb-2">
             <img 
               src="/logo.svg" 
-              alt="Lemon Mining" 
+              alt="CITREA Mining" 
               className="h-28 md:h-36 w-auto object-contain"
             />
           </div>
 
           {/* Game Info */}
           <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 space-y-4 w-full">
-            <div className="flex flex-col sm:flex-row items-center justify-end gap-4">
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="flex flex-col sm:flex-row items-center justify-end gap-4"
+            >
               <div className="flex items-center gap-4">
                 {account && (
                   <div className="text-sm font-mono bg-gray-100 px-3 py-1 rounded">
@@ -494,7 +499,7 @@ export default function DiamondMiner() {
                   )}
                 </div>
               </div>
-            </div>
+            </motion.div>
 
             {/* Active Game Warning */}
             {activeGame?.isActive && (
@@ -505,7 +510,12 @@ export default function DiamondMiner() {
 
             {/* Player Stats */}
             {playerStats && (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg"
+              >
                 <div>
                   <div className="text-sm text-gray-500">Games</div>
                   <div className="font-mono">{playerStats.totalGames.toString()}</div>
@@ -522,16 +532,26 @@ export default function DiamondMiner() {
                   <div className="text-sm text-gray-500">Earnings</div>
                   <div className="font-mono">{Number(ethers.formatEther(playerStats.totalEarnings)).toFixed(3)} CBTC</div>
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {/* Bet Selection */}
-            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-              {BET_AMOUNTS.map((amount) => (
-                <button
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className="grid grid-cols-3 sm:grid-cols-5 gap-2"
+            >
+              {BET_AMOUNTS.map((amount, index) => (
+                <motion.button
                   key={amount}
                   onClick={() => setSelectedBet(amount)}
                   disabled={isLoading}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.1 }}
                   className={`p-2 rounded-md text-center transition-all ${
                     selectedBet === amount 
                       ? 'bg-gradient-to-r from-[#ff5005] to-[#f79c11] text-white shadow-md' 
@@ -539,12 +559,17 @@ export default function DiamondMiner() {
                   } disabled:opacity-50`}
                 >
                   {amount} CBTC
-                </button>
+                </motion.button>
               ))}
-            </div>
+            </motion.div>
 
             {/* Game Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.6 }}
+              className="grid grid-cols-2 sm:grid-cols-4 gap-4"
+            >
               <div>
                 <div className="text-sm text-gray-500 mb-1">Current Bet</div>
                 <div className="flex items-center gap-1 font-mono">
@@ -569,7 +594,7 @@ export default function DiamondMiner() {
                   {calculateCurrentEarnings() > 0 ? '+' : ''}{calculateCurrentEarnings().toFixed(3)} CBTC
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
 
           {/* Game Status */}
@@ -607,33 +632,48 @@ export default function DiamondMiner() {
 
         {/* Center Game Grid */}
         <div className="w-full lg:w-3/5 flex items-center justify-center">
-          <div className="max-w-2xl w-full">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="max-w-2xl w-full"
+          >
             <div className="grid grid-cols-5 gap-4 aspect-square">
-              {gameState.grid.map((item, index) => (
+          {gameState.grid.map((item, index) => (
                 <motion.button
                   key={index}
                   onClick={() => revealTile(index)}
                   disabled={gameState.revealed[index] || gameState.gameOver || isLoading}
-                  className="aspect-square bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-2 flex items-center justify-center hover:bg-white/100 transition-all disabled:cursor-not-allowed disabled:opacity-50"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  className={`aspect-square rounded-lg flex items-center justify-center transition-all disabled:cursor-not-allowed ${
+                    gameState.revealed[index] 
+                      ? 'bg-transparent' 
+                      : 'bg-white/90 backdrop-blur-sm hover:bg-white hover:shadow-xl shadow-lg'
+                  }`}
+                  whileHover={{ scale: 1.05, rotate: 2 }}
+                  whileTap={{ scale: 0.95 }}
+                  initial={gameState.revealed[index] ? { scale: 0, rotate: -180 } : { scale: 1 }}
+                  animate={gameState.revealed[index] ? { scale: 1, rotate: 0 } : { scale: 1 }}
+                  transition={{ type: "spring", stiffness: 200, damping: 15 }}
                 >
                   {gameState.revealed[index] ? (
                     <motion.img 
                       initial={{ scale: 0, rotate: -180 }}
                       animate={{ scale: 1, rotate: 0 }}
-                      transition={{ type: "spring", duration: 0.5 }}
+                      transition={{ type: "spring", stiffness: 200, damping: 15 }}
                       src={item === "bomb" ? "/mine.svg" : "/lemon.svg"} 
                       alt={item} 
-                      className="w-4/5 h-4/5 object-contain"
+                      className="w-full h-full object-contain"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gray-100/50 rounded-lg" />
+                    <motion.div 
+                      whileHover={{ scale: 1.1 }}
+                      className="w-full h-full bg-white rounded-lg shadow-inner" 
+                    />
                   )}
                 </motion.button>
               ))}
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </div>
