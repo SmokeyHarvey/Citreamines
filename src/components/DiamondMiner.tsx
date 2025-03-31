@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useWeb3 } from "../contexts/Web3Context";
 import { ethers } from "ethers";
+import { Leaderboard } from './Leaderboard';
+import { LeaderboardService } from '../services/leaderboard';
 
 interface GameState {
   grid: string[];
@@ -80,6 +82,7 @@ export default function DiamondMiner() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeGame, setActiveGame] = useState<ActiveGame | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [leaderboardService] = useState(() => new LeaderboardService());
 
   // Reset all states when account changes
   useEffect(() => {
@@ -110,6 +113,26 @@ export default function DiamondMiner() {
       checkActiveGame();
     }
   }, [contract, account]);
+
+  useEffect(() => {
+    const updateLeaderboard = async () => {
+      if (playerStats && account) {
+        try {
+          await leaderboardService.updatePlayerStats({
+            address: account,
+            totalGames: Number(playerStats.totalGames),
+            wins: Number(playerStats.totalWins),
+            losses: Number(playerStats.totalLosses),
+            totalEarnings: ethers.formatEther(playerStats.totalEarnings)
+          });
+        } catch (err) {
+          console.error('Failed to update leaderboard:', err);
+        }
+      }
+    };
+
+    updateLeaderboard();
+  }, [playerStats, account, leaderboardService]);
 
   const checkActiveGame = async () => {
     if (!contract || !account) return;
@@ -322,7 +345,7 @@ export default function DiamondMiner() {
       });
 
       // If all lemons are revealed, complete game with win
-      if (newRemainingLemons === 0) {
+      if (newRemainingLemons === 0 && activeGame) {
         const currentEarnings = calculateCurrentEarnings();
         const totalEarnings = currentEarnings + Number(ethers.formatEther(activeGame.betAmount));
         const earnings = ethers.parseEther(totalEarnings.toString());
@@ -444,236 +467,239 @@ export default function DiamondMiner() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#ff5005] to-[#f79c11] text-gray-900 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-8">
-        {/* Left Sidebar */}
-        <div className="w-full lg:w-2/5 space-y-2">
-          {/* Logo */}
-          <div className="flex justify-center mb-2">
-            <img 
-              src="/logo.svg" 
-              alt="CITREA Mining" 
-              className="h-28 md:h-36 w-auto object-contain"
-            />
-          </div>
+      <div className="max-w-7xl mx-auto flex flex-col gap-8">
+        {/* Top Section */}
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Left Sidebar */}
+          <div className="w-full lg:w-2/5 space-y-2">
+            {/* Logo */}
+            <div className="flex justify-center mb-2">
+              <img 
+                src="/logo.svg" 
+                alt="CITREA Mining" 
+                className="h-28 md:h-36 w-auto object-contain"
+              />
+            </div>
 
-          {/* Game Info */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 space-y-4 w-full">
-            <motion.div 
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="flex flex-col sm:flex-row items-center justify-end gap-4"
-            >
-              <div className="flex items-center gap-4">
-                {account && (
-                  <div className="text-sm font-mono bg-gray-100 px-3 py-1 rounded">
-                    {account.slice(0, 6)}...{account.slice(-4)}
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  {!account ? (
-                    <button 
-                      onClick={connect}
-                      disabled={isLoading}
-                      className="px-4 py-2 bg-gradient-to-r from-[#ff5005] to-[#f79c11] text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
-                    >
-                      {isLoading ? 'Connecting...' : 'Connect Wallet'}
-                    </button>
-                  ) : (
-                    <>
+            {/* Game Info */}
+            <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 space-y-4 w-full">
+              <motion.div 
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="flex flex-col sm:flex-row items-center justify-end gap-4"
+              >
+                <div className="flex items-center gap-4">
+                  {account && (
+                    <div className="text-sm font-mono bg-gray-100 px-3 py-1 rounded">
+                      {account.slice(0, 6)}...{account.slice(-4)}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    {!account ? (
                       <button 
-                        onClick={startNewGame}
-                        disabled={isLoading || gameState.isActive}
+                        onClick={connect}
+                        disabled={isLoading}
                         className="px-4 py-2 bg-gradient-to-r from-[#ff5005] to-[#f79c11] text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
                       >
-                        {isLoading ? 'Loading...' : 'New Game'}
+                        {isLoading ? 'Connecting...' : 'Connect Wallet'}
                       </button>
-                      <button 
-                        onClick={handleDisconnect}
-                        disabled={isLoading}
-                        className="px-4 py-2 bg-red-500 text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
-                      >
-                        {isLoading ? 'Disconnecting...' : 'Disconnect'}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Active Game Warning */}
-            {activeGame?.isActive && (
-              <div className="bg-yellow-100/90 backdrop-blur-sm text-yellow-700 p-4 rounded-lg text-center font-semibold shadow-lg">
-                You have an active game in progress. Complete it before starting a new one.
-              </div>
-            )}
-
-            {/* Player Stats */}
-            {playerStats && (
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg"
-              >
-                <div>
-                  <div className="text-sm text-gray-500">Games</div>
-                  <div className="font-mono">{playerStats.totalGames.toString()}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Wins</div>
-                  <div className="font-mono">{playerStats.totalWins.toString()}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Losses</div>
-                  <div className="font-mono">{playerStats.totalLosses.toString()}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Earnings</div>
-                  <div className="font-mono">{Number(ethers.formatEther(playerStats.totalEarnings)).toFixed(3)} CBTC</div>
+                    ) : (
+                      <>
+                        <button 
+                          onClick={startNewGame}
+                          disabled={isLoading || gameState.isActive}
+                          className="px-4 py-2 bg-gradient-to-r from-[#ff5005] to-[#f79c11] text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
+                        >
+                          {isLoading ? 'Loading...' : 'New Game'}
+                        </button>
+                        <button 
+                          onClick={handleDisconnect}
+                          disabled={isLoading}
+                          className="px-4 py-2 bg-red-500 text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
+                        >
+                          {isLoading ? 'Disconnecting...' : 'Disconnect'}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </motion.div>
-            )}
 
-            {/* Bet Selection */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
-              className="grid grid-cols-3 sm:grid-cols-5 gap-2"
-            >
-              {BET_AMOUNTS.map((amount, index) => (
-                <motion.button
-                  key={amount}
-                  onClick={() => setSelectedBet(amount)}
-                  disabled={isLoading}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.1 }}
-                  className={`p-2 rounded-md text-center transition-all ${
-                    selectedBet === amount 
-                      ? 'bg-gradient-to-r from-[#ff5005] to-[#f79c11] text-white shadow-md' 
-                      : 'bg-white hover:bg-gray-50'
-                  } disabled:opacity-50`}
+              {/* Active Game Warning */}
+              {activeGame && gameState.isActive && (
+                <div className="bg-yellow-100/90 backdrop-blur-sm text-yellow-700 p-4 rounded-lg text-center font-semibold shadow-lg">
+                  You have an active game in progress. Complete it before starting a new one.
+                </div>
+              )}
+
+              {/* Player Stats */}
+              {playerStats && (
+                <motion.div 
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                  className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg"
                 >
-                  {amount} CBTC
-                </motion.button>
-              ))}
-            </motion.div>
+                  <div>
+                    <div className="text-sm text-gray-500">Games</div>
+                    <div className="font-mono">{playerStats.totalGames.toString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Wins</div>
+                    <div className="font-mono">{playerStats.totalWins.toString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Losses</div>
+                    <div className="font-mono">{playerStats.totalLosses.toString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-gray-500">Earnings</div>
+                    <div className="font-mono">{Number(ethers.formatEther(playerStats.totalEarnings)).toFixed(3)} CBTC</div>
+                  </div>
+                </motion.div>
+              )}
 
-            {/* Game Stats */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.6 }}
-              className="grid grid-cols-2 sm:grid-cols-4 gap-4"
-            >
-              <div>
-                <div className="text-sm text-gray-500 mb-1">Current Bet</div>
-                <div className="flex items-center gap-1 font-mono">
-                  {gameState.stake.toFixed(3)} CBTC
+              {/* Bet Selection */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+                className="grid grid-cols-3 sm:grid-cols-5 gap-2"
+              >
+                {BET_AMOUNTS.map((amount, index) => (
+                  <motion.button
+                    key={amount}
+                    onClick={() => setSelectedBet(amount)}
+                    disabled={isLoading}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.1 }}
+                    className={`p-2 rounded-md text-center transition-all ${
+                      selectedBet === amount 
+                        ? 'bg-gradient-to-r from-[#ff5005] to-[#f79c11] text-white shadow-md' 
+                        : 'bg-white hover:bg-gray-50'
+                    } disabled:opacity-50`}
+                  >
+                    {amount} CBTC
+                  </motion.button>
+                ))}
+              </motion.div>
+
+              {/* Game Stats */}
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.6 }}
+                className="grid grid-cols-2 sm:grid-cols-4 gap-4"
+              >
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">Current Bet</div>
+                  <div className="flex items-center gap-1 font-mono">
+                    {gameState.stake.toFixed(3)} CBTC
+                  </div>
                 </div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-500 mb-1">Multiplier</div>
-                <div className="font-mono">{gameState.payout.toFixed(1)}×</div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-500 mb-1">Wallet Balance</div>
-                <div className="flex items-center gap-1 text-blue-500 font-mono">
-                  {walletBalance.toFixed(3)} CBTC
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">Multiplier</div>
+                  <div className="font-mono">{gameState.payout.toFixed(1)}×</div>
                 </div>
-              </div>
-              <div>
-                <div className="text-sm text-gray-500 mb-1">Current Profit</div>
-                <div className={`flex items-center gap-1 font-mono ${
-                  calculateCurrentEarnings() > 0 ? 'text-green-500' : 'text-red-500'
-                }`}>
-                  {calculateCurrentEarnings() > 0 ? '+' : ''}{calculateCurrentEarnings().toFixed(3)} CBTC
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">Wallet Balance</div>
+                  <div className="flex items-center gap-1 text-blue-500 font-mono">
+                    {walletBalance.toFixed(3)} CBTC
+                  </div>
                 </div>
+                <div>
+                  <div className="text-sm text-gray-500 mb-1">Current Profit</div>
+                  <div className={`flex items-center gap-1 font-mono ${
+                    calculateCurrentEarnings() > 0 ? 'text-green-500' : 'text-red-500'
+                  }`}>
+                    {calculateCurrentEarnings() > 0 ? '+' : ''}{calculateCurrentEarnings().toFixed(3)} CBTC
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Game Status */}
+            {gameState.gameOver && (
+              <div className="bg-red-100/90 backdrop-blur-sm text-red-700 p-4 rounded-lg text-center font-semibold shadow-lg">
+                Game Over! You hit a mine and lost your bet.
+                <button
+                  onClick={() => {
+                    setSelectedBet(0.005);
+                    startNewGame();
+                  }}
+                  disabled={isLoading}
+                  className="mt-2 px-4 py-2 bg-gradient-to-r from-[#ff5005] to-[#f79c11] text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {isLoading ? 'Loading...' : 'Start New Game'}
+                </button>
               </div>
-            </motion.div>
+            )}
+            
+            {!gameState.gameOver && calculateCurrentEarnings() > 0 && (
+              <div className="bg-green-100/90 backdrop-blur-sm text-green-700 p-4 rounded-lg text-center shadow-lg">
+                <div className="font-semibold">Current Progress</div>
+                <div>{remainingLemons} lemons remaining</div>
+                <div>Current profit: {calculateCurrentEarnings().toFixed(3)} CBTC</div>
+                <button
+                  onClick={withdraw}
+                  disabled={isLoading}
+                  className="mt-2 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors disabled:opacity-50"
+                >
+                  {isLoading ? 'Processing...' : `Withdraw ${calculateCurrentEarnings().toFixed(3)} CBTC`}
+                </button>
+              </div>
+            )}
           </div>
-
-          {/* Game Status */}
-          {gameState.gameOver && (
-            <div className="bg-red-100/90 backdrop-blur-sm text-red-700 p-4 rounded-lg text-center font-semibold shadow-lg">
-              Game Over! You hit a mine and lost your bet.
-              <button
-                onClick={() => {
-                  setSelectedBet(0.005);
-                  startNewGame();
-                }}
-                disabled={isLoading}
-                className="mt-2 px-4 py-2 bg-gradient-to-r from-[#ff5005] to-[#f79c11] text-white rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                {isLoading ? 'Loading...' : 'Start New Game'}
-              </button>
-            </div>
-          )}
           
-          {!gameState.gameOver && calculateCurrentEarnings() > 0 && (
-            <div className="bg-green-100/90 backdrop-blur-sm text-green-700 p-4 rounded-lg text-center shadow-lg">
-              <div className="font-semibold">Current Progress</div>
-              <div>{remainingLemons} lemons remaining</div>
-              <div>Current profit: {calculateCurrentEarnings().toFixed(3)} CBTC</div>
-              <button
-                onClick={withdraw}
-                disabled={isLoading}
-                className="mt-2 px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors disabled:opacity-50"
-              >
-                {isLoading ? 'Processing...' : `Withdraw ${calculateCurrentEarnings().toFixed(3)} CBTC`}
-              </button>
+          {/* Game Grid */}
+          <div className="w-full lg:w-3/5 flex items-center justify-center">
+            <div className="max-w-2xl w-full">
+              <div className="grid grid-cols-5 gap-4 aspect-square">
+                {gameState.grid.map((item, index) => (
+                  <motion.button
+                    key={index}
+                    onClick={() => revealTile(index)}
+                    disabled={gameState.revealed[index] || gameState.gameOver || isLoading}
+                    className={`aspect-square rounded-lg flex items-center justify-center transition-all disabled:cursor-not-allowed ${
+                      gameState.revealed[index] 
+                        ? 'bg-transparent' 
+                        : 'bg-white/90 backdrop-blur-sm hover:bg-white hover:shadow-xl shadow-lg'
+                    }`}
+                    whileHover={{ scale: 1.05, rotate: 2 }}
+                    whileTap={{ scale: 0.95 }}
+                    initial={gameState.revealed[index] ? { scale: 0, rotate: -180 } : { scale: 1 }}
+                    animate={gameState.revealed[index] ? { scale: 1, rotate: 0 } : { scale: 1 }}
+                    transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                  >
+                    {gameState.revealed[index] ? (
+                      <motion.img 
+                        initial={{ scale: 0, rotate: -180 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        transition={{ type: "spring", stiffness: 200, damping: 15 }}
+                        src={item === "bomb" ? "/mine.svg" : "/lemon.svg"} 
+                        alt={item} 
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <motion.div 
+                        whileHover={{ scale: 1.1 }}
+                        className="w-full h-full bg-white rounded-lg shadow-inner" 
+                      />
+                    )}
+                  </motion.button>
+                ))}
+              </div>
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Center Game Grid */}
-        <div className="w-full lg:w-3/5 flex items-center justify-center">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="max-w-2xl w-full"
-          >
-            <div className="grid grid-cols-5 gap-4 aspect-square">
-          {gameState.grid.map((item, index) => (
-                <motion.button
-                  key={index}
-                  onClick={() => revealTile(index)}
-                  disabled={gameState.revealed[index] || gameState.gameOver || isLoading}
-                  className={`aspect-square rounded-lg flex items-center justify-center transition-all disabled:cursor-not-allowed ${
-                    gameState.revealed[index] 
-                      ? 'bg-transparent' 
-                      : 'bg-white/90 backdrop-blur-sm hover:bg-white hover:shadow-xl shadow-lg'
-                  }`}
-                  whileHover={{ scale: 1.05, rotate: 2 }}
-                  whileTap={{ scale: 0.95 }}
-                  initial={gameState.revealed[index] ? { scale: 0, rotate: -180 } : { scale: 1 }}
-                  animate={gameState.revealed[index] ? { scale: 1, rotate: 0 } : { scale: 1 }}
-                  transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                >
-                  {gameState.revealed[index] ? (
-                    <motion.img 
-                      initial={{ scale: 0, rotate: -180 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                      src={item === "bomb" ? "/mine.svg" : "/lemon.svg"} 
-                      alt={item} 
-                      className="w-full h-full object-contain"
-                    />
-                  ) : (
-                    <motion.div 
-                      whileHover={{ scale: 1.1 }}
-                      className="w-full h-full bg-white rounded-lg shadow-inner" 
-                    />
-                  )}
-                </motion.button>
-              ))}
-            </div>
-          </motion.div>
+        {/* Leaderboard Section */}
+        <div className="w-full">
+          <Leaderboard />
         </div>
       </div>
     </div>
