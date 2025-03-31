@@ -1,11 +1,12 @@
 import React from "react";
 import DiamondMiner from "./components/DiamondMiner";
+import { Web3ReactProviderWrapper } from "./contexts/Web3Context";
 
 function App() {
   return (
-    <div className="App">
+    <Web3ReactProviderWrapper>
       <DiamondMiner />
-    </div>
+    </Web3ReactProviderWrapper>
   );
 }
 
